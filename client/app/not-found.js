@@ -3,6 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Page Not Found | Evalio - 404 Error",
   description: "The page you're looking for on Evalio could not be found. Please return to the homepage or contact support if you need assistance.",
+  robots: { index: false, follow: true },
 };
 
 export default function NotFound() {

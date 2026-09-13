@@ -17,7 +17,7 @@ export default function Footer() {
           <div className="flex flex-col">
               <h5 className="font-bold text-slate-900 mb-6">Connect With Me</h5>
               <ul className="space-y-4 text-[15px] flex flex-col">
-                  {/* <li><Link href="https://x.com/pulkitgarg04" className="hover:text-[#0ddc90] transition-colors" target="_blank">X (Twitter)</Link></li> */}
+                  <li><Link href="https://x.com/pulkitgxrg" className="hover:text-[#0ddc90] transition-colors" target="_blank">X (Twitter)</Link></li>
                   <li><Link href="https://linkedin.com/in/pulkitgxrg" className="hover:text-[#0ddc90] transition-colors" target="_blank">LinkedIn</Link></li>
                   <li><Link href="https://github.com/pulkitgxrg" className="hover:text-[#0ddc90] transition-colors" target="_blank">GitHub</Link></li>
               </ul>

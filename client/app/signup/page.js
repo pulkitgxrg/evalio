@@ -8,6 +8,7 @@ import { useSignupMutation } from '@/hooks/useAuth';
 export default function SignupPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const signupMutation = useSignupMutation();
@@ -182,14 +183,24 @@ export default function SignupPage() {
 
           <div className="space-y-2">
             <label className="text-sm font-bold text-[#0a3a30] leading-none" htmlFor="confirm_password">Confirm Password</label>
-            <input
-              className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0a3a30]/20 focus-visible:border-[#0a3a30] transition-all"
-              id="confirm_password"
-              value={formData.confirm_password}
-              onChange={handleChange}
-              type="password"
-              required
-            />
+            <div className="relative">
+              <input
+                className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0a3a30]/20 focus-visible:border-[#0a3a30] transition-all pr-10"
+                id="confirm_password"
+                value={formData.confirm_password}
+                onChange={handleChange}
+                type={showConfirmPassword ? "text" : "password"}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                tabIndex="-1"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button

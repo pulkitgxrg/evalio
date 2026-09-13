@@ -1,6 +1,7 @@
 require('dotenv').config({ path: process.env.DOTENV_CONFIG_PATH || '.env' });
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const routes = require('./routes');
 const config = require('./config/config');
@@ -37,8 +38,15 @@ app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
-app.use('/health', ( req, res ) => {
-    res.status(200).json({ message: 'Server is healthy' });
+app.get('/health', (req, res) => {
+    const dbConnected = mongoose.connection.readyState === 1;
+
+    res.status(dbConnected ? 200 : 503).json({
+        status: dbConnected ? 'ok' : 'degraded',
+        uptime: process.uptime(),
+        db: dbConnected ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString(),
+    });
 });
 app.use('/api/v1', routes);
 

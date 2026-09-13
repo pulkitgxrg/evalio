@@ -1,64 +1,24 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Activity, CheckCircle2, Clock3, FileText, ShieldCheck, Users } from 'lucide-react';
+import { useAdminOverview } from '@/hooks/useAdminOverview';
+
+const emptyStats = {
+    usersCount: 0,
+    testsCount: 0,
+    testsTakenCount: 0,
+    activeSessionsCount: 0
+};
 
 export default function AdminDashboard() {
-    const [dashboard, setDashboard] = useState({
-        stats: {
-            usersCount: 0,
-            testsCount: 0,
-            testsTakenCount: 0,
-            activeSessionsCount: 0
-        },
-        recentLogins: [],
-        recentTestSessions: []
-    });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { data, isPending: loading, error: queryError } = useAdminOverview();
 
-    useEffect(() => {
-        const fetchAdminOverview = async () => {
-            try {
-                setLoading(true);
-                setError('');
-
-                const currentUserStr = localStorage.getItem('user');
-                if (!currentUserStr) {
-                    throw new Error('Not authenticated');
-                }
-
-                const currentUser = JSON.parse(currentUserStr);
-                const headers = { userId: currentUser._id || currentUser.user_id };
-
-                const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/admin/overview`, {
-                    credentials: 'include',
-                    headers
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data?.error || 'Failed to fetch admin overview');
-                }
-
-                setDashboard({
-                    stats: data?.stats || {
-                        usersCount: 0,
-                        testsCount: 0,
-                        testsTakenCount: 0,
-                        activeSessionsCount: 0
-                    },
-                    recentLogins: Array.isArray(data?.recentLogins) ? data.recentLogins : [],
-                    recentTestSessions: Array.isArray(data?.recentTestSessions) ? data.recentTestSessions : []
-                });
-            } catch (error) {
-                setError(error.message || 'Failed to fetch dashboard stats');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchAdminOverview();
-    }, []);
+    const dashboard = {
+        stats: data?.stats || emptyStats,
+        recentLogins: Array.isArray(data?.recentLogins) ? data.recentLogins : [],
+        recentTestSessions: Array.isArray(data?.recentTestSessions) ? data.recentTestSessions : []
+    };
+    const error = queryError?.message;
 
     const statCards = useMemo(() => ([
         {

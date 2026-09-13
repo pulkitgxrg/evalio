@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { useCurrentUser, useLogoutMutation } from '@/hooks/useAuth';
 
 const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
@@ -25,39 +25,22 @@ const navItems = [
 export function AdminSidebar() {
     const pathname = usePathname();
     const router = useRouter();
-    const [user, setUser] = useState({ name: 'Admin', role: 'Admin' });
-    const [loggingOut, setLoggingOut] = useState(false);
+    const { data: currentUser } = useCurrentUser();
+    const logoutMutation = useLogoutMutation();
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            try {
-                const parsedUser = JSON.parse(storedUser);
-                setUser({
-                    name: parsedUser.username || parsedUser.name || 'Admin',
-                    role: parsedUser.role || 'Admin'
-                });
-            } catch (e) {
-                console.error('Failed to parse user data', e);
-            }
-        }
-    }, []);
+    const user = {
+        name: currentUser?.username || 'Admin',
+        role: currentUser?.role || 'Admin',
+    };
 
-    const handleLogout = async () => {
-        try {
-            setLoggingOut(true);
-            await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/logout`, {
-                method: 'POST',
-                credentials: 'include',
-            });
-        } catch (err) {
-            console.error('Logout failed:', err);
-        } finally {
-            setLoggingOut(false);
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
-            router.replace('/login');
-        }
+    const handleLogout = () => {
+        logoutMutation.mutate(undefined, {
+            onSettled: () => {
+                localStorage.removeItem('user');
+                localStorage.removeItem('token');
+                router.replace('/login');
+            },
+        });
     };
 
     return (
@@ -108,11 +91,11 @@ export function AdminSidebar() {
 
                     <button
                         onClick={handleLogout}
-                        disabled={loggingOut}
+                        disabled={logoutMutation.isPending}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2 mt-1 text-sm font-medium text-slate-600 bg-white border border-gray-200 rounded-md hover:bg-slate-50 hover:text-red-600 transition-colors disabled:opacity-50 cursor-pointer"
                     >
-                        {loggingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
-                        <span>{loggingOut ? 'Logging out...' : 'Log out'}</span>
+                        {logoutMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+                        <span>{logoutMutation.isPending ? 'Logging out...' : 'Log out'}</span>
                     </button>
                 </div>
             </div>

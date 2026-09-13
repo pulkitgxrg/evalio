@@ -1,36 +1,16 @@
 "use client";
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useVerifyEmail } from '@/hooks/useAuth';
 
 export default function VerifyEmail() {
     const { token } = useParams();
-    const [status, setStatus] = useState('verifying');
-    const [message, setMessage] = useState('Verifying your email...');
+    const { isPending, isError, data, error } = useVerifyEmail(token);
 
-    useEffect(() => {
-        if (!token) return;
-
-        const verifyEmail = async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/verify/${token}`);
-                const data = await res.json();
-
-                if (res.ok) {
-                    setStatus('success');
-                    setMessage(data.message || 'Email verified successfully!');
-                } else {
-                    setStatus('error');
-                    setMessage(data.message || 'Verification failed. Invalid or expired token.');
-                }
-            } catch (error) {
-                setStatus('error');
-                setMessage('An error occurred. Please try again later.');
-            }
-        };
-
-        verifyEmail();
-    }, [token]);
+    const status = isPending ? 'verifying' : isError ? 'error' : 'success';
+    const message = isError
+        ? (error?.message || 'Verification failed. Invalid or expired token.')
+        : (data?.message || 'Email verified successfully!');
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8 font-sans">

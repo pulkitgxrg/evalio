@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import {
     Trophy,
     Target,
@@ -11,72 +11,52 @@ import {
     BarChart3
 } from 'lucide-react';
 import { StatsPageSkeleton } from '@/components/dashboard/StatsPageSkeleton';
+import { useSessionStats, useSessionHistory } from '@/hooks/useSessions';
 
 export default function StatsPage() {
-    const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { data: statsData, isPending: statsPending, error: statsError } = useSessionStats();
+    const { data: historyData, isPending: historyPending, error: historyError } = useSessionHistory();
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const [statsRes, historyRes] = await Promise.all([
-                    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/sessions/stats`, {
-                        credentials: 'include',
-                    }),
-                    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/sessions/history`, {
-                        credentials: 'include',
-                    })
-                ]);
+    const loading = statsPending || historyPending;
+    const error = statsError?.message || historyError?.message;
 
-                if (!statsRes.ok) throw new Error('Failed to fetch stats');
-                if (!historyRes.ok) throw new Error('Failed to fetch history');
+    const stats = useMemo(() => {
+        if (!statsData || !historyData) return null;
 
-                const statsData = await statsRes.json();
-                const historyData = await historyRes.json();
+        const attempts = Array.isArray(historyData) ? historyData : [];
+        const bestScore = attempts.length > 0
+            ? Math.max(...attempts.map((a) => Number(a.score) || 0))
+            : 0;
+        const totalCorrect = attempts.reduce((sum, a) => sum + (Number(a.correctAnswers) || 0), 0);
+        const totalIncorrect = attempts.reduce((sum, a) => sum + (Number(a.incorrectAnswers) || 0), 0);
+        const totalAnswered = totalCorrect + totalIncorrect;
 
-                const attempts = Array.isArray(historyData) ? historyData : [];
-                const bestScore = attempts.length > 0
-                    ? Math.max(...attempts.map((a) => Number(a.score) || 0))
-                    : 0;
-                const totalCorrect = attempts.reduce((sum, a) => sum + (Number(a.correctAnswers) || 0), 0);
-                const totalIncorrect = attempts.reduce((sum, a) => sum + (Number(a.incorrectAnswers) || 0), 0);
-                const totalAnswered = totalCorrect + totalIncorrect;
+        const subjectStats = {};
+        (statsData.subjectAnalysis || []).forEach((item) => {
+            subjectStats[item.subject] = {
+                count: item.totalTests,
+                averageScore: item.accuracy
+            };
+        });
 
-                const subjectStats = {};
-                (statsData.subjectAnalysis || []).forEach((item) => {
-                    subjectStats[item.subject] = {
-                        count: item.totalTests,
-                        averageScore: item.accuracy
-                    };
-                });
+        const recentAttempts = attempts.slice(0, 5).map((attempt) => ({
+            id: attempt._id,
+            testTitle: attempt.test?.title || 'Unknown Test',
+            subject: attempt.test?.subject || 'Unknown',
+            score: Number(attempt.score) || 0,
+            completedAt: attempt.submittedAt || attempt.updatedAt || attempt.createdAt
+        }));
 
-                const recentAttempts = attempts.slice(0, 5).map((attempt) => ({
-                    id: attempt._id,
-                    testTitle: attempt.test?.title || 'Unknown Test',
-                    subject: attempt.test?.subject || 'Unknown',
-                    score: Number(attempt.score) || 0,
-                    completedAt: attempt.submittedAt || attempt.updatedAt || attempt.createdAt
-                }));
-
-                setStats({
-                    totalTests: statsData.overview?.totalTests || 0,
-                    averageScore: statsData.overview?.averageScore || 0,
-                    bestScore,
-                    totalAnswered,
-                    totalCorrect,
-                    subjectStats,
-                    recentAttempts
-                });
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
+        return {
+            totalTests: statsData.overview?.totalTests || 0,
+            averageScore: statsData.overview?.averageScore || 0,
+            bestScore,
+            totalAnswered,
+            totalCorrect,
+            subjectStats,
+            recentAttempts
         };
-
-        fetchStats();
-    }, []);
+    }, [statsData, historyData]);
 
     if (loading) {
         return <StatsPageSkeleton />;

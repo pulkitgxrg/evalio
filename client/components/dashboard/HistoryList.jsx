@@ -1,32 +1,11 @@
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, ArrowRight } from 'lucide-react';
+import { useSessionHistory } from '@/hooks/useSessions';
 
 export function HistoryList() {
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { data: history = [], isPending } = useSessionHistory();
 
-    useEffect(() => {
-        const fetchHistory = async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/sessions/history`, {
-                    credentials: 'include'
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setHistory(data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch history", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHistory();
-    }, []);
-
-    if (loading) {
+    if (isPending) {
         return (
             <div className="space-y-4 max-w-6xl mx-auto animate-pulse">
                 <div className="h-6 w-32 rounded bg-gray-200" />
@@ -89,7 +68,7 @@ export function HistoryList() {
                                     <Calendar size={10} /> {new Date(session.createdAt).toLocaleDateString()}
                                 </div>
                             </div>
-                            
+
                             <div className="col-span-3">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${(session.status === 'SUBMITTED' || session.status === 'EXPIRED') ? 'border-emerald-200 text-emerald-700 bg-emerald-50/50' : 'border-amber-200 text-amber-700 bg-amber-50/50'}`}>
                                     {(session.status === 'SUBMITTED' || session.status === 'EXPIRED') ? 'Completed' : 'In Progress'}

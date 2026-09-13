@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { AlertCircle, BookOpen, CheckCircle, Plus, Trash2 } from "lucide-react";
+import { useSubjects, useCreateSubjectMutation, useDeleteSubjectMutation } from "@/hooks/useSubjects";
 
 export default function SubjectsPage() {
-    const [subjects, setSubjects] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [adding, setAdding] = useState(false);
+    const { data, isPending: loading, error: fetchError } = useSubjects();
+    const createSubjectMutation = useCreateSubjectMutation();
+    const deleteSubjectMutation = useDeleteSubjectMutation();
+
+    const subjects = Array.isArray(data) ? data : [];
 
     const [newSubject, setNewSubject] = useState("");
     const [year, setYear] = useState(1);
@@ -19,29 +22,6 @@ export default function SubjectsPage() {
         setSuccess("");
     };
 
-    const fetchSubjects = useCallback(async () => {
-        try {
-            setLoading(true);
-            clearNotices();
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`);
-            if (!res.ok) {
-                throw new Error("Failed to fetch subjects");
-            }
-
-            const data = await res.json();
-            setSubjects(Array.isArray(data) ? data : []);
-        } catch (err) {
-            setError(err.message || "Unable to fetch subjects");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchSubjects();
-    }, [fetchSubjects]);
-
     const handleAddSubject = async (event) => {
         event.preventDefault();
         clearNotices();
@@ -53,45 +33,16 @@ export default function SubjectsPage() {
         }
 
         try {
-            setAdding(true);
-
-            const currentUserStr = localStorage.getItem("user");
-            if (!currentUserStr) {
-                throw new Error("You must be logged in as admin");
-            }
-
-            const currentUser = JSON.parse(currentUserStr);
-            const userId = currentUser._id || currentUser.user_id;
-            if (!userId) {
-                throw new Error("You must be logged in as admin");
-            }
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`, {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                    userId
-                },
-                body: JSON.stringify({
-                    name: trimmedSubject,
-                    year: Number(year)
-                })
+            const data = await createSubjectMutation.mutateAsync({
+                name: trimmedSubject,
+                year: Number(year)
             });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data?.error || "Failed to create subject");
-            }
 
             setSuccess(data?.message || "Subject created successfully");
             setNewSubject("");
             setYear(1);
-            await fetchSubjects();
         } catch (err) {
             setError(err.message || "Unable to create subject");
-        } finally {
-            setAdding(false);
         }
     };
 
@@ -104,36 +55,14 @@ export default function SubjectsPage() {
         }
 
         try {
-            const currentUserStr = localStorage.getItem("user");
-            if (!currentUserStr) {
-                throw new Error("You must be logged in as admin");
-            }
-
-            const currentUser = JSON.parse(currentUserStr);
-            const userId = currentUser._id || currentUser.user_id;
-            if (!userId) {
-                throw new Error("You must be logged in as admin");
-            }
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects/${subjectId}`, {
-                method: "DELETE",
-                credentials: "include",
-                headers: {
-                    userId
-                }
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data?.error || "Failed to delete subject");
-            }
-
+            const data = await deleteSubjectMutation.mutateAsync(subjectId);
             setSuccess(data?.message || "Subject deleted successfully");
-            setSubjects((prevSubjects) => prevSubjects.filter((subject) => subject._id !== subjectId));
         } catch (err) {
             setError(err.message || "Unable to delete subject");
         }
     };
+
+    const displayError = error || fetchError?.message;
 
     return (
         <div className="space-y-6 pb-10">
@@ -174,19 +103,19 @@ export default function SubjectsPage() {
 
                     <button
                         type="submit"
-                        disabled={adding}
+                        disabled={createSubjectMutation.isPending}
                         className="inline-flex items-center justify-center gap-2 rounded-md bg-[#0ddc90] px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-[#0bc07d] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <Plus size={16} />
-                        {adding ? "Adding..." : "Add Subject"}
+                        {createSubjectMutation.isPending ? "Adding..." : "Add Subject"}
                     </button>
                 </div>
             </form>
 
-            {error && (
+            {displayError && (
                 <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     <AlertCircle size={16} />
-                    <span>{error}</span>
+                    <span>{displayError}</span>
                 </div>
             )}
 

@@ -1,11 +1,23 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Edit, Search, Trash2, Users } from 'lucide-react';
+import { useAdminUsers, useUpdateAdminUserMutation, useDeleteAdminUserMutation } from '@/hooks/useAdminUsers';
+
+function getCurrentAdmin() {
+    try {
+        const currentUserStr = localStorage.getItem('user');
+        return currentUserStr ? JSON.parse(currentUserStr) : null;
+    } catch {
+        return null;
+    }
+}
 
 export default function UserManagementPage() {
-    const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { data, isPending: loading, error: fetchError } = useAdminUsers();
+    const updateUserMutation = useUpdateAdminUserMutation();
+    const deleteUserMutation = useDeleteAdminUserMutation();
+
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
@@ -18,49 +30,12 @@ export default function UserManagementPage() {
         study_year: 1
     });
 
-    const currentAdmin = useMemo(() => {
-        try {
-            const currentUserStr = localStorage.getItem('user');
-            return currentUserStr ? JSON.parse(currentUserStr) : null;
-        } catch {
-            return null;
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            setError('');
-
-            const currentUserStr = localStorage.getItem('user');
-            if (!currentUserStr) throw new Error('Not authenticated');
-            const currentUser = JSON.parse(currentUserStr);
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/users`, {
-                credentials: 'include',
-                headers: {
-                    userId: currentUser._id || currentUser.user_id
-                }
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data?.error || 'Failed to fetch users');
-            }
-
-            setUsers(Array.isArray(data) ? data : []);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const currentAdmin = useMemo(() => getCurrentAdmin(), []);
+    const displayError = error || fetchError?.message;
+    const totalUsers = Array.isArray(data) ? data.length : 0;
 
     const filteredUsers = useMemo(() => {
+        const users = Array.isArray(data) ? data : [];
         const query = search.trim().toLowerCase();
         const sorted = [...users].sort((a, b) => {
             const aDate = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
@@ -75,7 +50,7 @@ export default function UserManagementPage() {
             || user.email?.toLowerCase().includes(query)
             || user.role?.toLowerCase().includes(query)
         ));
-    }, [users, search]);
+    }, [data, search]);
 
     const openEditModal = (user) => {
         setEditingUser(user);
@@ -94,30 +69,11 @@ export default function UserManagementPage() {
 
         if (!editingUser) return;
 
+        setError('');
+        setSuccess('');
+
         try {
-            setError('');
-            setSuccess('');
-
-            const currentUserStr = localStorage.getItem('user');
-            if (!currentUserStr) throw new Error('Not authenticated');
-            const currentUser = JSON.parse(currentUserStr);
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/users/${editingUser._id}`, {
-                method: 'PUT',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    userId: currentUser._id || currentUser.user_id
-                },
-                body: JSON.stringify(editForm)
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data?.error || data?.message || 'Failed to update user');
-            }
-
-            setUsers((prev) => prev.map((user) => (user._id === editingUser._id ? data : user)));
+            await updateUserMutation.mutateAsync({ userId: editingUser._id, ...editForm });
             setSuccess('User updated successfully');
             setEditingUser(null);
         } catch (err) {
@@ -135,28 +91,11 @@ export default function UserManagementPage() {
         const confirmed = window.confirm(`Delete ${user.name}? This action cannot be undone.`);
         if (!confirmed) return;
 
+        setError('');
+        setSuccess('');
+
         try {
-            setError('');
-            setSuccess('');
-
-            const currentUserStr = localStorage.getItem('user');
-            if (!currentUserStr) throw new Error('Not authenticated');
-            const currentUser = JSON.parse(currentUserStr);
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/users/${user._id}`, {
-                method: 'DELETE',
-                credentials: 'include',
-                headers: {
-                    userId: currentUser._id || currentUser.user_id
-                }
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data?.error || 'Failed to delete user');
-            }
-
-            setUsers((prev) => prev.filter((item) => item._id !== user._id));
+            const data = await deleteUserMutation.mutateAsync(user._id);
             setSuccess(data?.message || 'User deleted successfully');
         } catch (err) {
             setError(err.message || 'Failed to delete user');
@@ -219,12 +158,12 @@ export default function UserManagementPage() {
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-sm font-semibold text-emerald-700">
                     <Users size={16} />
-                    {users.length} total users
+                    {totalUsers} total users
                 </div>
             </div>
 
-            {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            {displayError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{displayError}</div>
             )}
             {success && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div>

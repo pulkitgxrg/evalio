@@ -1,52 +1,20 @@
 "use client";
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { LogOut } from 'lucide-react';
+import { useCurrentUser, useLogoutMutation } from '@/hooks/useAuth';
 
 export default function LandingNavbar() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { data: user, isPending: loading } = useCurrentUser({ retry: false });
+  const logoutMutation = useLogoutMutation();
+  const loggingOut = logoutMutation.isPending;
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/me`, {
-          credentials: 'include',
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        }
-      } catch (err) {
-        console.error('Auth check failed:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      setLoggingOut(true);
-
-      await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      
-      setUser(null);
-    } catch (err) {
-      console.error('Logout failed:', err);
-    } finally {
-      setLoggingOut(false);
-    }
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSettled: () => {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      },
+    });
   };
 
   return (

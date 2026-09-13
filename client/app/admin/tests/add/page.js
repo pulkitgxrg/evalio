@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, AlertCircle, Filter, Plus, Wand2, List } from 'lucide-react';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useAdminQuestions, useAvailableQuestionCounts, useGenerateQuestionsMutation } from '@/hooks/useQuestions';
+import { useCreateTestMutation } from '@/hooks/useTests';
 
 export default function CreateTestPage() {
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    const [questions, setQuestions] = useState([]);
-    const [subjects, setSubjects] = useState([]);
-
+    const [generatedQuestions, setGeneratedQuestions] = useState(null);
     const [mode, setMode] = useState('manual');
 
     const [formData, setFormData] = useState({
@@ -29,76 +29,38 @@ export default function CreateTestPage() {
             Hard: 0
         }
     });
+    const [debouncedGenConfig, setDebouncedGenConfig] = useState(genConfig);
 
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    useEffect(() => {
-        const fetchSubjects = async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`);
-                if (res.ok) setSubjects(await res.json());
-            } catch (err) {
-                console.error("Failed to fetch subjects");
-            }
-        };
-        fetchSubjects();
-    }, []);
+    const { data: subjects = [] } = useSubjects();
+
+    const { data: manualQuestions = [] } = useAdminQuestions(
+        { subject: formData.subject, excludeUsed: excludeUsed || undefined },
+        { enabled: mode === 'manual' && Boolean(formData.subject) }
+    );
 
     useEffect(() => {
-        if (!formData.subject || mode !== 'manual') return;
-
-        const fetchQuestions = async () => {
-            try {
-                let url = `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions?subject=${encodeURIComponent(formData.subject)}`;
-                if (excludeUsed) {
-                    url += '&excludeUsed=true';
-                }
-                const res = await fetch(url, { credentials: 'include' });
-                if (res.ok) {
-                    const data = await res.json();
-                    setQuestions(data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch questions");
-            }
-        };
-        fetchQuestions();
-    }, [formData.subject, excludeUsed, mode]);
-
-    const [availableCounts, setAvailableCounts] = useState({ Easy: 0, Medium: 0, Hard: 0 });
-
-    useEffect(() => {
-        if (!formData.subject || mode !== 'generate') return;
-
-        const fetchCounts = async () => {
-            try {
-                const user = JSON.parse(localStorage.getItem('user') || '{}');
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/available-counts`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'userId': user._id
-                    },
-                    body: JSON.stringify({
-                        subject: formData.subject,
-                        topic: genConfig.topic,
-                        subTopic: genConfig.subTopic,
-                        excludeUsed: excludeUsed
-                    })
-                });
-                if (res.ok) {
-                    setAvailableCounts(await res.json());
-                }
-            } catch (err) {
-                console.error("Failed to fetch available counts");
-            }
-        };
-        // Debounce slightly to avoid too many requests while typing
-        const timer = setTimeout(fetchCounts, 500);
+        const timer = setTimeout(() => setDebouncedGenConfig(genConfig), 500);
         return () => clearTimeout(timer);
-    }, [formData.subject, genConfig.topic, genConfig.subTopic, excludeUsed, mode]);
+    }, [genConfig]);
+
+    const { data: availableCounts = { Easy: 0, Medium: 0, Hard: 0 } } = useAvailableQuestionCounts(
+        {
+            subject: formData.subject,
+            topic: debouncedGenConfig.topic,
+            subTopic: debouncedGenConfig.subTopic,
+            excludeUsed
+        },
+        { enabled: mode === 'generate' && Boolean(formData.subject) }
+    );
+
+    const generateMutation = useGenerateQuestionsMutation();
+    const createTestMutation = useCreateTestMutation();
+    const loading = generateMutation.isPending || createTestMutation.isPending;
+
+    const questions = mode === 'manual' ? manualQuestions : (generatedQuestions || []);
 
     const handleQuestionToggle = (qId) => {
         setFormData(prev => {
@@ -112,7 +74,6 @@ export default function CreateTestPage() {
     };
 
     const handleGenerate = async () => {
-        setLoading(true);
         setError('');
         try {
             const totalRequested = Object.values(genConfig.difficultyCounts).reduce((a, b) => a + Number(b), 0);
@@ -121,79 +82,45 @@ export default function CreateTestPage() {
             for (const [level, count] of Object.entries(genConfig.difficultyCounts)) {
                 if (count > availableCounts[level]) {
                     setError(`You requested ${count} ${level} questions but only ${availableCounts[level]} are available.`);
-                    setLoading(false);
                     return;
                 }
             }
 
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/generate`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'userId': user._id
-                },
-                body: JSON.stringify({
-                    subject: formData.subject,
-                    topic: genConfig.topic,
-                    subTopic: genConfig.subTopic,
-                    difficultyCounts: genConfig.difficultyCounts,
-                    excludeUsed: excludeUsed
-                })
+            const data = await generateMutation.mutateAsync({
+                subject: formData.subject,
+                topic: genConfig.topic,
+                subTopic: genConfig.subTopic,
+                difficultyCounts: genConfig.difficultyCounts,
+                excludeUsed: excludeUsed
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to generate questions");
 
             const generatedIds = data.map(q => q.questionId);
             setFormData(prev => ({ ...prev, questions: generatedIds }));
-            setQuestions(data);
+            setGeneratedQuestions(data);
             setSuccess(`Generated ${data.length} questions successfully!`);
-
         } catch (err) {
             setError(err.message);
-        } finally {
-            setLoading(false);
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
         setSuccess('');
 
         if (formData.questions.length === 0) {
             setError("Please select at least one question.");
-            setLoading(false);
             return;
         }
 
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'userId': user._id
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.error || "Failed to create test");
-
+            await createTestMutation.mutateAsync(formData);
             setSuccess("Test created successfully!");
             setTimeout(() => {
                 router.push('/admin/tests');
             }, 1500);
         } catch (err) {
             setError(err.message);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -232,7 +159,7 @@ export default function CreateTestPage() {
                                     value={formData.subject}
                                     onChange={(e) => {
                                         setFormData({ ...formData, subject: e.target.value, questions: [] });
-                                        setQuestions([]);
+                                        setGeneratedQuestions(null);
                                     }}
                                     className="w-full p-3 rounded-md border border-gray-200 focus:border-[#0ddc90] outline-none bg-white"
                                 >

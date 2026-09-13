@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
     History,
@@ -12,53 +12,33 @@ import {
     Trophy
 } from 'lucide-react';
 import { HistoryPageSkeleton } from '@/components/dashboard/HistoryPageSkeleton';
+import { useSessionHistory } from '@/hooks/useSessions';
 
 export default function HistoryPage() {
-    const [history, setHistory] = useState([]);
-    const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [page, setPage] = useState(1);
     const pageSize = 10;
 
-    const fetchHistory = async (page = 1) => {
-        try {
-            setLoading(true);
-            setError('');
-            const res = await fetch(
-                `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/sessions/history`,
-                { credentials: 'include' }
-            );
+    const { data: allHistory, isPending: loading, error: fetchError } = useSessionHistory();
+    const error = fetchError?.message;
 
-            if (!res.ok) throw new Error('Failed to fetch history');
+    const { history, pagination } = useMemo(() => {
+        const data = allHistory || [];
+        const pages = Math.max(1, Math.ceil(data.length / pageSize));
+        const start = (page - 1) * pageSize;
 
-            const data = await res.json();
-            const start = (page - 1) * pageSize;
-            const pagedData = data.slice(start, start + pageSize);
-
-            setHistory(pagedData);
-            setPagination({
-                total: data.length,
-                page,
-                pages: Math.max(1, Math.ceil(data.length / pageSize))
-            });
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchHistory();
-    }, []);
+        return {
+            history: data.slice(start, start + pageSize),
+            pagination: { total: data.length, page, pages }
+        };
+    }, [allHistory, page]);
 
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= pagination.pages) {
-            fetchHistory(newPage);
+            setPage(newPage);
         }
     };
 
-    if (loading && history.length === 0) {
+    if (loading) {
         return <HistoryPageSkeleton />;
     }
 

@@ -1,71 +1,30 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Clock, FileText, ChevronRight } from 'lucide-react';
 import { SubjectDetailsSkeleton } from '@/components/dashboard/SubjectDetailsSkeleton';
+import { useCurrentUser } from '@/hooks/useAuth';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useTests } from '@/hooks/useTests';
 
 export default function SubjectDetailsPage() {
   const params = useParams();
-  const [tests, setTests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [subjectName, setSubjectName] = useState('');
-  const [userYear, setUserYear] = useState(null);
+  const { data: user, isPending: userPending } = useCurrentUser();
+  const userYear = user?.study_year || null;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        let currentUserYear = null;
+  const { data: subjects = [], isPending: subjectsPending } = useSubjects(undefined, {
+    enabled: !userPending,
+  });
+  const subject = subjects.find((s) => s._id === params.id);
+  const subjectName = subject?.name || '';
 
-        const userRes = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/me`, {
-          credentials: 'include'
-        });
+  const { data: tests = [], isPending: testsPending } = useTests(
+    subject ? { subject: subject.name, year: userYear || undefined } : undefined,
+    { enabled: Boolean(subject) }
+  );
 
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          currentUserYear = userData.study_year || null;
-          setUserYear(currentUserYear);
-        }
-
-        const subRes = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`, {
-          credentials: 'include'
-        });
-
-        if (!subRes.ok) {
-          throw new Error('Failed to fetch subjects');
-        }
-
-        const subjects = await subRes.json();
-        const subject = subjects.find((s) => s._id === params.id);
-
-        if (!subject) {
-          setLoading(false);
-          return;
-        }
-
-        setSubjectName(subject.name);
-
-        const yearQuery = currentUserYear ? `&year=${encodeURIComponent(currentUserYear)}` : '';
-        const testsRes = await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests?subject=${encodeURIComponent(subject.name)}${yearQuery}`,
-          { credentials: 'include' }
-        );
-
-        if (testsRes.ok) {
-          const testsData = await testsRes.json();
-          setTests(testsData);
-        }
-      } catch (err) {
-        console.error('Failed to load subject tests:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (params?.id) {
-      fetchData();
-    }
-  }, [params?.id]);
+  const loading = userPending || subjectsPending || (Boolean(subject) && testsPending);
 
   if (loading) {
     return <SubjectDetailsSkeleton />;

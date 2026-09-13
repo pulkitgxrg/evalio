@@ -1,54 +1,26 @@
 import React from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useCurrentUser } from '@/hooks/useAuth';
+import { useSubjects } from '@/hooks/useSubjects';
 
-export function SubjectGrid({ 
-    linkPrefix = '/dashboard/subject', 
+export function SubjectGrid({
+    linkPrefix = '/dashboard/subject',
     filterByUserYear = true,
     title = 'My Subjects',
     countLabel = 'Tests',
     viewLabel = 'View Tests',
     emptyLabel = 'tests'
 }) {
-    const [subjects, setSubjects] = React.useState([]);
-    const [loading, setLoading] = React.useState(true);
-    const [userYear, setUserYear] = React.useState(1);
-    const [userName, setUserName] = React.useState('');
-    const initialFilterByUserYear = React.useRef(filterByUserYear);
+    const { data: user, isPending: userPending } = useCurrentUser({ enabled: filterByUserYear });
+    const userYear = user?.study_year || 1;
 
-    React.useEffect(() => {
-        const fetchData = async () => {
-            try {
-                let year = 1;
+    const { data: subjects = [], isPending: subjectsPending } = useSubjects(
+        filterByUserYear ? userYear : undefined,
+        { enabled: !filterByUserYear || !userPending }
+    );
 
-                const userRes = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/me`, {
-                    credentials: 'include'
-                });
-
-                if (userRes.ok) {
-                    const userData = await userRes.json();
-                    year = userData.study_year || 1;
-                    setUserYear(year);
-                    setUserName(userData.username || 'Student');
-                }
-
-                const subjectsUrl = initialFilterByUserYear.current
-                    ? `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects?year=${year}`
-                    : `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`;
-
-                const res = await fetch(subjectsUrl);
-                if (res.ok) {
-                    const data = await res.json();
-                    setSubjects(data);
-                }
-            } catch (error) {
-                console.error("Failed to fetch subjects", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+    const loading = (filterByUserYear && userPending) || subjectsPending;
 
     if (loading) {
         return (

@@ -1,15 +1,19 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Save, ArrowLeft, Upload, FileSpreadsheet, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useCreateQuestionMutation, useBulkCreateQuestionsMutation } from '@/hooks/useQuestions';
 
 export default function AddQuestionPage() {
     const [activeTab, setActiveTab] = useState('manual');
-    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const createQuestionMutation = useCreateQuestionMutation();
+    const bulkCreateQuestionsMutation = useBulkCreateQuestionsMutation();
+    const loading = createQuestionMutation.isPending || bulkCreateQuestionsMutation.isPending;
 
     const [formData, setFormData] = useState({
         questionId: '',
@@ -44,23 +48,8 @@ export default function AddQuestionPage() {
     const [bulkPreview, setBulkPreview] = useState([]);
     const [defaultBulkDifficulty, setDefaultBulkDifficulty] = useState('Easy');
 
-    const [subjects, setSubjects] = useState([]);
+    const { data: subjects = [] } = useSubjects();
     const [selectedSubject, setSelectedSubject] = useState('');
-
-    useEffect(() => {
-        const fetchSubjects = async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setSubjects(data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch subjects", err);
-            }
-        };
-        fetchSubjects();
-    }, []);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -68,7 +57,6 @@ export default function AddQuestionPage() {
 
     const handleManualSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
         setSuccess('');
 
@@ -86,11 +74,6 @@ export default function AddQuestionPage() {
 
             if (options.length < 4) {
                 throw new Error("At least 4 options are required");
-            }
-
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            if (!user._id) {
-                throw new Error("You must be logged in as admin");
             }
 
             if (!options.includes(formData.correctAnswer)) {
@@ -111,21 +94,7 @@ export default function AddQuestionPage() {
                 correctAnswer: formData.correctAnswer
             };
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'userId': user._id
-                },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'Failed to create question');
-            }
+            await createQuestionMutation.mutateAsync(payload);
 
             setSuccess('Question created successfully!');
             setFormData({
@@ -143,8 +112,6 @@ export default function AddQuestionPage() {
 
         } catch (err) {
             setError(err.message);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -189,22 +156,16 @@ export default function AddQuestionPage() {
     };
 
     const handleBulkSubmit = async () => {
-        setLoading(true);
         setError('');
         setSuccess('');
 
         try {
             if (!selectedSubject) throw new Error("Please select a Subject first from the dropdown above.");
 
-
-
             const requiredFields = ['question', 'option1', 'option2', 'option3', 'option4', 'correctAnswer'];
             for (const field of requiredFields) {
                 if (!columnMapping[field]) throw new Error(`Please map the "${field}" column.`);
             }
-
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            if (!user._id) throw new Error("You must be logged in as admin");
 
             const formattedQuestions = parsedData.map((row) => {
                 const getVal = (field) => {
@@ -238,35 +199,7 @@ export default function AddQuestionPage() {
 
             if (validQuestions.length === 0) throw new Error("No valid questions found to upload.");
 
-            const BATCH_SIZE = 50;
-            let totalUploaded = 0;
-            const batches = [];
-
-            for (let i = 0; i < validQuestions.length; i += BATCH_SIZE) {
-                batches.push(validQuestions.slice(i, i + BATCH_SIZE));
-            }
-
-            for (let i = 0; i < batches.length; i++) {
-                const batch = batches[i];
-
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bulk`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'userId': user._id
-                    },
-                    body: JSON.stringify({ questions: batch })
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.error || `Failed to upload batch ${i + 1}`);
-                }
-
-                totalUploaded += (data.count || 0);
-            }
+            const totalUploaded = await bulkCreateQuestionsMutation.mutateAsync(validQuestions);
 
             setSuccess(`Successfully uploaded ${totalUploaded} questions!`);
             setBulkFile(null);
@@ -275,8 +208,6 @@ export default function AddQuestionPage() {
 
         } catch (err) {
             setError(err.message);
-        } finally {
-            setLoading(false);
         }
     };
 

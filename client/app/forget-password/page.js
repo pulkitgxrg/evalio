@@ -4,40 +4,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Mail, Loader2 } from "lucide-react";
+import { useForgotPasswordMutation } from "@/hooks/useAuth";
 
 export default function ForgetPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const forgotPasswordMutation = useForgotPasswordMutation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/resetPasswordToken`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        },
-      );
-
-      let data = {};
-      try {
-        data = await res.json();
-      } catch {}
-
-      if (!res.ok) {
-        throw new Error(
-          data.error || data.message || "Failed to send reset email",
-        );
-      }
+      const data = await forgotPasswordMutation.mutateAsync(email);
 
       setSuccess(
         data.message ||
@@ -45,8 +27,6 @@ export default function ForgetPasswordPage() {
       );
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -126,10 +106,10 @@ export default function ForgetPasswordPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={forgotPasswordMutation.isPending}
             className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0a3a30] px-8 text-sm font-bold text-white shadow-lg shadow-emerald-900/10 transition-all hover:bg-[#022c22] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? (
+            {forgotPasswordMutation.isPending ? (
               <>
                 <Loader2 className="animate-spin mr-2" size={18} />
                 Sending reset link...

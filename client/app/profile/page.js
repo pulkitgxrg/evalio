@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -12,116 +12,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { useProfile, useUpdateProfileMutation } from "@/hooks/useProfile";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [profile, setProfile] = useState({
-    name: "",
-    username: "",
-    email: "",
-    createdAt: "",
-    role: "",
-    study_year: "",
-  });
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/users/profile`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            credentials: "include",
-          },
-        );
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(
-            data.message || data.error || "Failed to load profile",
-          );
-        }
-
-        setProfile({
-          name: data.name || "",
-          email: data.email || "",
-          createdAt: data.createdAt || "",
-          role: data.role || "",
-          study_year: data.study_year ?? "",
-        });
-      } catch (err) {
-        setError(err.message || "Something went wrong");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [router]);
-
-  const handleChange = (e) => {
-    const { id, value } = e.target;
-    setProfile((prev) => ({
-      ...prev,
-      [id]: value,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      setSaving(true);
-      setError("");
-      setSuccess("");
-
-      const body = {
-        name: profile.name,
-        email: profile.email,
-        study_year: Number(profile.study_year) || profile.study_year,
-      };
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/users/profile`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(body),
-        },
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(
-          data.message || data.error || "Failed to update profile",
-        );
-      }
-
-      setSuccess(data.message || "Profile updated successfully");
-    } catch (err) {
-      setError(err.message || "Something went wrong");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const formattedDate = profile.createdAt
-    ? new Date(profile.createdAt).toLocaleDateString()
-    : "-";
+  const { data, isPending: loading, error: fetchError } = useProfile();
 
   if (loading) {
     return (
@@ -136,6 +31,54 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  return <ProfileForm router={router} initialProfile={data} loadError={fetchError} />;
+}
+
+function ProfileForm({ router, initialProfile, loadError }) {
+  const updateProfileMutation = useUpdateProfileMutation();
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [profile, setProfile] = useState({
+    name: initialProfile?.name || "",
+    email: initialProfile?.email || "",
+    createdAt: initialProfile?.createdAt || "",
+    role: initialProfile?.role || "",
+    study_year: initialProfile?.study_year ?? "",
+  });
+
+  const handleChange = (e) => {
+    const { id, value } = e.target;
+    setProfile((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    try {
+      const body = {
+        name: profile.name,
+        email: profile.email,
+        study_year: Number(profile.study_year) || profile.study_year,
+      };
+
+      const result = await updateProfileMutation.mutateAsync(body);
+      setSuccess(result.message || "Profile updated successfully");
+    } catch (err) {
+      setError(err.message || "Something went wrong");
+    }
+  };
+
+  const saving = updateProfileMutation.isPending;
+  const formattedDate = profile.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString()
+    : "-";
+  const displayError = error || loadError?.message;
 
   return (
     <div className="flex min-h-screen bg-gray-50/30 font-sans text-slate-900">
@@ -176,11 +119,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {(error || success) && (
+              {(displayError || success) && (
                 <div className="mb-6 space-y-2">
-                  {error && (
+                  {displayError && (
                     <div className="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
-                      {error}
+                      {displayError}
                     </div>
                   )}
                   {success && (

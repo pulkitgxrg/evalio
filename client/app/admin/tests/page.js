@@ -1,61 +1,27 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Edit, Plus, Trash2 } from 'lucide-react';
+import { useTests, useDeleteTestMutation } from '@/hooks/useTests';
 
 export default function TestManagementPage() {
     const router = useRouter();
-    const [tests, setTests] = useState([]);
-    const [loading, setLoading] = useState(true);
-
+    const { data, isPending: loading, error: fetchError } = useTests();
+    const deleteTestMutation = useDeleteTestMutation();
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        fetchTests();
-    }, []);
-
-    const fetchTests = async () => {
-        try {
-            setLoading(true);
-            setError('');
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests`);
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data?.error || 'Failed to fetch tests');
-            }
-
-            setTests(Array.isArray(data) ? data : []);
-        } catch (err) {
-            setError(err.message || 'Failed to fetch tests');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const tests = Array.isArray(data) ? data : [];
+    const displayError = error || fetchError?.message;
 
     const handleDeleteTest = async (testId, testTitle) => {
         if (!confirm(`Are you sure you want to delete "${testTitle}"?`)) {
             return;
         }
 
+        setError('');
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}`, {
-                method: 'DELETE',
-                credentials: 'include',
-                headers: {
-                    userId: user._id
-                }
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data?.error || 'Failed to delete test');
-            }
-
-            setTests((prev) => prev.filter((t) => t._id !== testId));
+            await deleteTestMutation.mutateAsync(testId);
         } catch (err) {
             setError(err.message || 'Failed to delete test');
         }
@@ -108,8 +74,8 @@ export default function TestManagementPage() {
                 </button>
             </div>
 
-            {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            {displayError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{displayError}</div>
             )}
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">

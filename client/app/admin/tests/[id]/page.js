@@ -1,45 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Clock3 } from 'lucide-react';
+import { useAdminTest } from '@/hooks/useTests';
 
 export default function TestQuestionsPage() {
     const router = useRouter();
     const params = useParams();
     const testId = params?.id;
 
-    const [test, setTest] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        if (!testId) return;
-
-        const fetchTest = async () => {
-            try {
-                setLoading(true);
-                setError('');
-
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}/admin`, {
-                    credentials: 'include'
-                });
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data?.error || data?.message || 'Failed to fetch test');
-                }
-
-                setTest(data);
-            } catch (err) {
-                setError(err.message || 'Failed to fetch test details');
-            } finally {
-                setLoading(false);
-             }
-         };
-
-         fetchTest();
-     }, [testId]);
+    const { data: test, isPending: loading, error: fetchError } = useAdminTest(testId);
+    const error = fetchError?.message;
 
     if (loading) {
         return (

@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { useSignupMutation } from '@/hooks/useAuth';
 
 export default function SignupPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const signupMutation = useSignupMutation();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -25,28 +26,16 @@ export default function SignupPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     setSuccess('');
 
     if (formData.password !== formData.confirm_password) {
       setError("Passwords do not match");
-      setLoading(false);
       return;
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Signup failed');
-      }
+      await signupMutation.mutateAsync(formData);
 
       setSuccess("Signup successful! Please check your email for verification.");
       setTimeout(() => {
@@ -55,8 +44,6 @@ export default function SignupPage() {
 
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -207,10 +194,10 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={signupMutation.isPending}
             className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0a3a30] px-8 text-sm font-bold text-white shadow-lg shadow-emerald-900/10 transition-all hover:bg-[#022c22] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating Account...' : 'Sign Up'}
+            {signupMutation.isPending ? 'Creating Account...' : 'Sign Up'}
           </button>
         </form>
 

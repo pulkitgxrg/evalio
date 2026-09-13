@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Mail, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSubmitContactMutation } from '@/hooks/useContact';
 
 export default function HelpPage() {
     return (
@@ -63,40 +64,16 @@ function ContactForm() {
         subject: '',
         message: ''
     });
-    const [status, setStatus] = useState('idle');
-    const [errorMsg, setErrorMsg] = useState('');
+    const contactMutation = useSubmitContactMutation();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setStatus('loading');
-        setErrorMsg('');
 
         try {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            if (!user._id) throw new Error("User not found. Please log in.");
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/contact`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    userId: user._id,
-                    subject: formData.subject,
-                    message: formData.message
-                })
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || "Failed to send message");
-            }
-
-            setStatus('success');
+            await contactMutation.mutateAsync(formData);
             setFormData({ subject: '', message: '' });
-        } catch (err) {
-            setStatus('error');
-            setErrorMsg(err.message);
+        } catch {
+            // surfaced via contactMutation.error below
         }
     };
 
@@ -107,7 +84,7 @@ function ContactForm() {
             </h2>
             <p className="text-slate-500 mb-6 text-sm">Have a query that&apos;s not answered above? Send us a message directly.</p>
 
-            {status === 'success' ? (
+            {contactMutation.isSuccess ? (
                 <div className="bg-[#f6fdff] border border-[#0ddc90]/20 rounded-md p-6 text-center">
                     <div className="w-10 h-10 bg-[#0ddc90]/20 rounded-full flex items-center justify-center mx-auto mb-3">
                         <Send size={16} className="text-[#0ddc90]" />
@@ -115,7 +92,7 @@ function ContactForm() {
                     <h3 className="text-base font-semibold text-slate-900 mb-1">Message Sent!</h3>
                     <p className="text-[#0ddc90] text-sm">We have received your query and will get back to you shortly.</p>
                     <button
-                        onClick={() => setStatus('idle')}
+                        onClick={() => contactMutation.reset()}
                         className="mt-4 text-sm font-medium text-blue-700 hover:text-blue-800 underline"
                     >
                         Send another message
@@ -146,19 +123,19 @@ function ContactForm() {
                         ></textarea>
                     </div>
 
-                    {status === 'error' && (
+                    {contactMutation.isError && (
                         <div className="p-3 rounded-md bg-red-50 text-red-600 text-sm border border-red-100">
-                            {errorMsg || "Something went wrong. Please try again."}
+                            {contactMutation.error?.message || "Something went wrong. Please try again."}
                         </div>
                     )}
 
                     <div className="flex justify-end pt-2">
                         <button
                             type="submit"
-                            disabled={status === 'loading'}
+                            disabled={contactMutation.isPending}
                             className="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-md shadow-xs hover:bg-blue-700 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                         >
-                            {status === 'loading' ? 'Sending...' : (
+                            {contactMutation.isPending ? 'Sending...' : (
                                 <>
                                     Send Message <Send size={14} />
                                 </>

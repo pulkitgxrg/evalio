@@ -1,32 +1,11 @@
-import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Trophy, Target, Activity, AlertCircle } from 'lucide-react';
+import { useSessionStats } from '@/hooks/useSessions';
 
 export function StatsOverview() {
-    const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { data: stats, isPending } = useSessionStats();
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/sessions/stats`, {
-                    credentials: 'include'
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setStats(data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch stats", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchStats();
-    }, []);
-
-    if (loading) return <div className="h-64 animate-pulse bg-gray-100 rounded-md"></div>;
+    if (isPending) return <div className="h-64 animate-pulse bg-gray-100 rounded-md"></div>;
 
     if (!stats || !stats.overview) return null;
 

@@ -1,123 +1,58 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, CheckCircle, XCircle, LayoutList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useQuestionBank } from '@/hooks/useQuestionBank';
 
 export default function QuestionBankQuestionsPage() {
   const params = useParams();
-  const [subjectName, setSubjectName] = useState('');
-  const [questions, setQuestions] = useState([]);
-  const [availableTopics, setAvailableTopics] = useState([]);
-  const [availableSubTopics, setAvailableSubTopics] = useState([]);
+  // Keyed by id so every navigation between subjects starts from fresh filter/page/answer state.
+  return <QuestionBankView key={params.id} id={params.id} />;
+}
+
+function QuestionBankView({ id }) {
   const [selectedTaxonomy, setSelectedTaxonomy] = useState('all');
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalQuestions, setTotalQuestions] = useState(0);
   const [revisionMode, setRevisionMode] = useState(false);
   const [userAnswers, setUserAnswers] = useState({});
 
-  useEffect(() => {
-    const fetchSubjectAndQuestions = async () => {
-      setLoading(true);
-      try {
-        let name = subjectName;
+  const { data: subjects = [], isPending: subjectsPending } = useSubjects();
+  const subjectName = subjects.find((s) => s._id === id)?.name || '';
 
-        if (!name) {
-          const subRes = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`, {
-            credentials: 'include'
-          });
-          if (subRes.ok) {
-            const subjects = await subRes.json();
-            const matchingSubject = subjects.find(s => s._id === params.id);
-            if (matchingSubject) {
-              name = matchingSubject.name;
-              setSubjectName(name);
-            }
-          }
-        }
+  const taxonomyQuery = {};
+  if (selectedTaxonomy !== 'all') {
+    const [taxonomyType, ...rawValueParts] = selectedTaxonomy.split('::');
+    const taxonomyValue = rawValueParts.join('::');
+    if (taxonomyType === 'topic') taxonomyQuery.topic = taxonomyValue;
+    if (taxonomyType === 'subTopic') taxonomyQuery.subTopic = taxonomyValue;
+  }
 
-        if (name) {
-          const queryParams = new URLSearchParams({
-            subject: name,
-            page: String(currentPage),
-            limit: '50'
-          });
+  const { data: questionsResult, isPending: questionsPending } = useQuestionBank(
+    { subject: subjectName, page: currentPage, limit: 50, ...taxonomyQuery },
+    { enabled: Boolean(subjectName) }
+  );
+  const questions = React.useMemo(() => questionsResult?.questions || [], [questionsResult]);
+  const totalPages = questionsResult?.totalPages || 1;
+  const totalQuestions = questionsResult?.total || 0;
 
-          if (selectedTaxonomy !== 'all') {
-            const [taxonomyType, ...rawValueParts] = selectedTaxonomy.split('::');
-            const taxonomyValue = rawValueParts.join('::');
-
-            if (taxonomyType === 'topic') {
-              queryParams.set('topic', taxonomyValue);
-            }
-
-            if (taxonomyType === 'subTopic') {
-              queryParams.set('subTopic', taxonomyValue);
-            }
-          }
-
-          const questionsRes = await fetch(
-            `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bank?${queryParams.toString()}`,
-            { credentials: 'include' }
-          );
-
-          if (questionsRes.ok) {
-            const result = await questionsRes.json();
-            setQuestions(result.questions || []);
-            setTotalPages(result.totalPages || 1);
-            setTotalQuestions(result.total || 0);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load questions:', err);
-      } finally {
-        setLoading(false);
-      }
+  const { data: taxonomyResult } = useQuestionBank(
+    { subject: subjectName, page: 1, limit: 5000 },
+    { enabled: Boolean(subjectName) }
+  );
+  const { availableTopics, availableSubTopics } = React.useMemo(() => {
+    const questionList = taxonomyResult?.questions || [];
+    return {
+      availableTopics: [...new Set(questionList.map((q) => q.topic?.trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b)),
+      availableSubTopics: [...new Set(questionList.map((q) => q.subTopic?.trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b)),
     };
+  }, [taxonomyResult]);
 
-    if (params?.id) {
-      fetchSubjectAndQuestions();
-    }
-  }, [params?.id, currentPage, subjectName, selectedTaxonomy]);
-
-  useEffect(() => {
-    const fetchAvailableTaxonomy = async () => {
-      if (!subjectName) return;
-
-      try {
-        const topicsRes = await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bank?subject=${encodeURIComponent(subjectName)}&page=1&limit=5000`,
-          { credentials: 'include' }
-        );
-
-        if (!topicsRes.ok) return;
-
-        const result = await topicsRes.json();
-        const questionList = result.questions || [];
-
-        const uniqueTopics = [...new Set(questionList.map((q) => q.topic?.trim()).filter(Boolean))]
-          .sort((a, b) => a.localeCompare(b));
-        const uniqueSubTopics = [...new Set(questionList.map((q) => q.subTopic?.trim()).filter(Boolean))]
-          .sort((a, b) => a.localeCompare(b));
-
-        setAvailableTopics(uniqueTopics);
-        setAvailableSubTopics(uniqueSubTopics);
-      } catch (err) {
-        console.error('Failed to load topic filters:', err);
-      }
-    };
-
-    fetchAvailableTaxonomy();
-  }, [subjectName, params?.id]);
-
-  useEffect(() => {
-    setSelectedTaxonomy('all');
-    setCurrentPage(1);
-    setUserAnswers({});
-  }, [params?.id]);
+  const loading = subjectsPending || (Boolean(subjectName) && questionsPending);
 
   const handleTaxonomyChange = (event) => {
     const taxonomyValue = event.target.value;

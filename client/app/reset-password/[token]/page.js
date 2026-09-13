@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Loader2 } from "lucide-react";
+import { useResetPasswordMutation } from "@/hooks/useAuth";
 
 export default function ResetPasswordPage() {
   const { token } = useParams();
@@ -10,15 +11,9 @@ export default function ResetPasswordPage() {
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(token ? "" : "Invalid reset link.");
   const [success, setSuccess] = useState("");
-
-  useEffect(() => {
-    if (!token) {
-      setError("Invalid reset link.");
-    }
-  }, [token]);
+  const resetPasswordMutation = useResetPasswordMutation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,35 +28,11 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/resetPassword/${token}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            password,
-            confirm_password: confirmPassword,
-          }),
-        }
-      );
-
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-
-      if (!res.ok) {
-        const message =
-          (data && (data.message || data.error)) || "Failed to reset password";
-        throw new Error(message);
-      }
+      await resetPasswordMutation.mutateAsync({ token, password, confirmPassword });
 
       setSuccess("Password reset successfully. You can now log in.");
       setTimeout(() => {
@@ -69,8 +40,6 @@ export default function ResetPasswordPage() {
       }, 2000);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -155,10 +124,10 @@ export default function ResetPasswordPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={resetPasswordMutation.isPending}
             className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0a3a30] px-6 text-sm font-bold text-white shadow-lg shadow-emerald-900/10 transition-all hover:bg-[#022c22] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? (
+            {resetPasswordMutation.isPending ? (
               <>
                 <Loader2 className="animate-spin mr-2" size={18} />
                 Updating password...

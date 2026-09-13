@@ -1,133 +1,123 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useTest, useUpdateTestMutation } from '@/hooks/useTests';
+import { useQuestionBank } from '@/hooks/useQuestions';
+
+function EditTestLoadingSkeleton() {
+    return (
+        <div className="space-y-6 pb-10 animate-pulse">
+            <div className="h-4 w-32 rounded bg-gray-100" />
+            <div className="space-y-2">
+                <div className="h-8 w-64 rounded-md bg-gray-200" />
+                <div className="h-4 w-96 rounded-md bg-gray-100" />
+            </div>
+            <div className="rounded-md border border-gray-200 bg-white p-6 shadow-xs space-y-4">
+                <div className="h-10 rounded-md bg-gray-100" />
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="h-10 rounded-md bg-gray-100" />
+                    <div className="h-10 rounded-md bg-gray-100" />
+                </div>
+                <div className="h-24 rounded-md bg-gray-100" />
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                    {Array.from({ length: 2 }).map((_, panel) => (
+                        <div key={panel} className="rounded-md border border-gray-200 p-3 space-y-3">
+                            <div className="h-5 w-40 rounded bg-gray-200" />
+                            {Array.from({ length: 4 }).map((__, row) => (
+                                <div key={row} className="h-12 rounded-md bg-gray-100" />
+                            ))}
+                        </div>
+                    ))}
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                    <div className="h-9 w-24 rounded-md bg-gray-100" />
+                    <div className="h-9 w-32 rounded-md bg-emerald-100/70" />
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function EditTestPage() {
     const router = useRouter();
     const params = useParams();
     const testId = params?.id;
 
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [questionBankLoading, setQuestionBankLoading] = useState(false);
+    const { data: test, isPending: testLoading, error: testError } = useTest(testId);
+    const { data: subjects = [] } = useSubjects();
 
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    if (testLoading) {
+        return <EditTestLoadingSkeleton />;
+    }
 
-    const [subjects, setSubjects] = useState([]);
-    const [currentQuestions, setCurrentQuestions] = useState([]);
-    const [questionBank, setQuestionBank] = useState([]);
+    if (testError) {
+        return (
+            <div className="space-y-4">
+                <button
+                    onClick={() => router.push('/admin/tests')}
+                    className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800"
+                >
+                    <ArrowLeft size={16} /> Back to tests
+                </button>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{testError.message}</div>
+            </div>
+        );
+    }
+
+    return <EditTestForm testId={testId} test={test} subjects={subjects} />;
+}
+
+function EditTestForm({ testId, test, subjects }) {
+    const router = useRouter();
+    const updateTestMutation = useUpdateTestMutation();
+
+    const initialQuestionObjects = Array.isArray(test?.questions) ? test.questions : [];
+
+    const [form, setForm] = useState({
+        title: test?.title || '',
+        subject: test?.subject || '',
+        duration: test?.duration || 30,
+        description: test?.description || '',
+        questions: initialQuestionObjects.map((question) => question?.questionId).filter(Boolean)
+    });
+
+    const [currentQuestions, setCurrentQuestions] = useState(initialQuestionObjects.map((question) => ({
+        questionId: question.questionId,
+        question: question.question || '',
+        topic: question.topic || '',
+        subTopic: question.subTopic || ''
+    })));
 
     const [removeSelection, setRemoveSelection] = useState([]);
     const [addSelection, setAddSelection] = useState([]);
     const [questionSearch, setQuestionSearch] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
 
-    const [form, setForm] = useState({
-        title: '',
-        subject: '',
-        duration: 30,
-        description: '',
-        questions: []
-    });
+    const { data: bankData, isPending: questionBankLoading, error: bankError } = useQuestionBank(
+        { subject: form.subject, excludeUsed: true, page: 1, limit: 5000 },
+        { enabled: Boolean(form.subject) }
+    );
 
-    useEffect(() => {
-        if (!testId) return;
-
-        const init = async () => {
-            try {
-                setLoading(true);
-                setError('');
-
-                const [testRes, subjectsRes] = await Promise.all([
-                    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}`),
-                    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`)
-                ]);
-
-                const testData = await testRes.json();
-                if (!testRes.ok) {
-                    throw new Error(testData?.error || testData?.message || 'Failed to fetch test');
-                }
-
-                const subjectData = subjectsRes.ok ? await subjectsRes.json() : [];
-                setSubjects(Array.isArray(subjectData) ? subjectData : []);
-
-                const questionObjects = Array.isArray(testData?.questions) ? testData.questions : [];
-                const questionIds = questionObjects.map((question) => question?.questionId).filter(Boolean);
-
-                setForm({
-                    title: testData?.title || '',
-                    subject: testData?.subject || '',
-                    duration: testData?.duration || 30,
-                    description: testData?.description || '',
-                    questions: questionIds
-                });
-
-                setCurrentQuestions(questionObjects.map((question) => ({
-                    questionId: question.questionId,
-                    question: question.question || '',
-                    topic: question.topic || '',
-                    subTopic: question.subTopic || ''
-                })));
-
-                // Start with no checkboxes selected for add/remove actions.
-                setRemoveSelection([]);
-                setAddSelection([]);
-
-                if (testData?.subject) {
-                    await fetchUnusedQuestionBank(testData.subject);
-                }
-            } catch (err) {
-                setError(err.message || 'Failed to load test editor');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        init();
-    }, [testId]);
-
-    const fetchUnusedQuestionBank = async (subjectName) => {
-        if (!subjectName) {
-            setQuestionBank([]);
-            return;
-        }
-
-        try {
-            setQuestionBankLoading(true);
-
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bank?subject=${encodeURIComponent(subjectName)}&excludeUsed=true&page=1&limit=5000`,
-                { credentials: 'include' }
-            );
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data?.error || 'Failed to fetch question bank');
-            }
-
-            const normalized = Array.isArray(data?.questions) ? data.questions : [];
-            normalized.sort((a, b) => (a.questionId || '').localeCompare(b.questionId || ''));
-            setQuestionBank(normalized);
-        } catch (err) {
-            setError(err.message || 'Failed to load question bank');
-        } finally {
-            setQuestionBankLoading(false);
-        }
-    };
+    const addedQuestionIds = useMemo(() => new Set(form.questions), [form.questions]);
 
     const filteredQuestionBank = useMemo(() => {
+        const questionBank = Array.isArray(bankData?.questions) ? bankData.questions : [];
         const query = questionSearch.trim().toLowerCase();
-        if (!query) return questionBank;
 
-        return questionBank.filter((question) => (
-            question.question?.toLowerCase().includes(query)
-            || question.questionId?.toLowerCase().includes(query)
-            || question.topic?.toLowerCase().includes(query)
-            || question.subTopic?.toLowerCase().includes(query)
-        ));
-    }, [questionBank, questionSearch]);
+        return questionBank
+            .filter((question) => !addedQuestionIds.has(question.questionId))
+            .filter((question) => (
+                !query
+                || question.question?.toLowerCase().includes(query)
+                || question.questionId?.toLowerCase().includes(query)
+                || question.topic?.toLowerCase().includes(query)
+                || question.subTopic?.toLowerCase().includes(query)
+            ));
+    }, [bankData, questionSearch, addedQuestionIds]);
 
     const toggleRemoveSelection = (questionId) => {
         setRemoveSelection((prev) => (
@@ -188,44 +178,30 @@ export default function EditTestPage() {
             return [...prev, ...additions];
         });
 
-        setQuestionBank((prev) => prev.filter((question) => !addSelection.includes(question.questionId)));
+        setAddSelection([]);
+    };
+
+    const handleSubjectChange = (nextSubject) => {
+        setForm((prev) => ({ ...prev, subject: nextSubject, questions: [] }));
+        setCurrentQuestions([]);
+        setRemoveSelection([]);
         setAddSelection([]);
     };
 
     const handleSave = async (event) => {
         event.preventDefault();
+        setError('');
+        setSuccess('');
 
         try {
-            setSaving(true);
-            setError('');
-            setSuccess('');
-
-            const userStr = localStorage.getItem('user');
-            if (!userStr) {
-                throw new Error('Not authenticated');
-            }
-
-            const user = JSON.parse(userStr);
-            const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}`, {
-                method: 'PUT',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    userId: user._id || user.user_id
-                },
-                body: JSON.stringify({
-                    title: form.title,
-                    subject: form.subject,
-                    duration: Number(form.duration),
-                    description: form.description,
-                    questions: form.questions
-                })
+            await updateTestMutation.mutateAsync({
+                testId,
+                title: form.title,
+                subject: form.subject,
+                duration: Number(form.duration),
+                description: form.description,
+                questions: form.questions
             });
-
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data?.error || 'Failed to update test');
-            }
 
             setSuccess('Test updated successfully');
             setTimeout(() => {
@@ -233,44 +209,11 @@ export default function EditTestPage() {
             }, 700);
         } catch (err) {
             setError(err.message || 'Failed to update test');
-        } finally {
-            setSaving(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="space-y-6 pb-10 animate-pulse">
-                <div className="h-4 w-32 rounded bg-gray-100" />
-                <div className="space-y-2">
-                    <div className="h-8 w-64 rounded-md bg-gray-200" />
-                    <div className="h-4 w-96 rounded-md bg-gray-100" />
-                </div>
-                <div className="rounded-md border border-gray-200 bg-white p-6 shadow-xs space-y-4">
-                    <div className="h-10 rounded-md bg-gray-100" />
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <div className="h-10 rounded-md bg-gray-100" />
-                        <div className="h-10 rounded-md bg-gray-100" />
-                    </div>
-                    <div className="h-24 rounded-md bg-gray-100" />
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                        {Array.from({ length: 2 }).map((_, panel) => (
-                            <div key={panel} className="rounded-md border border-gray-200 p-3 space-y-3">
-                                <div className="h-5 w-40 rounded bg-gray-200" />
-                                {Array.from({ length: 4 }).map((__, row) => (
-                                    <div key={row} className="h-12 rounded-md bg-gray-100" />
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <div className="h-9 w-24 rounded-md bg-gray-100" />
-                        <div className="h-9 w-32 rounded-md bg-emerald-100/70" />
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const displayError = error || bankError?.message;
+    const saving = updateTestMutation.isPending;
 
     return (
         <div className="space-y-6 pb-10">
@@ -286,8 +229,8 @@ export default function EditTestPage() {
                 <p className="mt-1 text-sm text-slate-500">Select by checkbox, delete selected from test, and add selected from unused question bank.</p>
             </div>
 
-            {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            {displayError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{displayError}</div>
             )}
             {success && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div>
@@ -304,14 +247,7 @@ export default function EditTestPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <select
                         value={form.subject}
-                        onChange={(e) => {
-                            const nextSubject = e.target.value;
-                            setForm((prev) => ({ ...prev, subject: nextSubject, questions: [] }));
-                            setCurrentQuestions([]);
-                            setRemoveSelection([]);
-                            setAddSelection([]);
-                            fetchUnusedQuestionBank(nextSubject);
-                        }}
+                        onChange={(e) => handleSubjectChange(e.target.value)}
                         className="rounded-md border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#0ddc90]"
                     >
                         <option value="">Select subject</option>

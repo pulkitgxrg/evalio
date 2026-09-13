@@ -98,7 +98,8 @@ export default function EditTestPage() {
             setQuestionBankLoading(true);
 
             const response = await fetch(
-                `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bank?subject=${encodeURIComponent(subjectName)}&excludeUsed=true&page=1&limit=5000`
+                `${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bank?subject=${encodeURIComponent(subjectName)}&excludeUsed=true&page=1&limit=5000`,
+                { credentials: 'include' }
             );
             const data = await response.json();
 
@@ -207,6 +208,7 @@ export default function EditTestPage() {
             const user = JSON.parse(userStr);
             const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}`, {
                 method: 'PUT',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     userId: user._id || user.user_id

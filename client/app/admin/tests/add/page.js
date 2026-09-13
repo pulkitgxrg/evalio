@@ -54,7 +54,7 @@ export default function CreateTestPage() {
                 if (excludeUsed) {
                     url += '&excludeUsed=true';
                 }
-                const res = await fetch(url);
+                const res = await fetch(url, { credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     setQuestions(data);
@@ -76,6 +76,7 @@ export default function CreateTestPage() {
                 const user = JSON.parse(localStorage.getItem('user') || '{}');
                 const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/available-counts`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                         'userId': user._id
@@ -128,6 +129,7 @@ export default function CreateTestPage() {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/generate`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     'userId': user._id
@@ -172,6 +174,7 @@ export default function CreateTestPage() {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     'userId': user._id

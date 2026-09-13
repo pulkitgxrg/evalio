@@ -44,6 +44,7 @@ export default function TestManagementPage() {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}`, {
                 method: 'DELETE',
+                credentials: 'include',
                 headers: {
                     userId: user._id
                 }

@@ -11,6 +11,7 @@ router.delete('/:id', isAdmin, testController.deleteTest);
 
 router.get('/:id/session', isAuth, testController.getTestSession);
 router.post('/:id/start', isAuth, testController.startTestSession);
+router.get('/:id/admin', isAdmin, testController.getTestByIdForAdmin);
 router.get('/:id', testController.getTestById);
 
 module.exports = router;

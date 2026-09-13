@@ -113,6 +113,7 @@ export default function AddQuestionPage() {
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     'userId': user._id
@@ -250,6 +251,7 @@ export default function AddQuestionPage() {
 
                 const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/questions/bulk`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                         'userId': user._id

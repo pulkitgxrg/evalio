@@ -4,11 +4,7 @@ const buildQuestionsFromTest = (testData) => (
   testData.questions.map((question) => ({
     id: question._id,
     text: question.question,
-    options: question.options,
-    difficulty: question.difficulty,
-    topic: question.topic,
-    subTopic: question.subTopic,
-    correctAnswer: question.correctAnswer
+    options: question.options
   }))
 );
 

@@ -21,7 +21,9 @@ export default function TestQuestionsPage() {
                 setLoading(true);
                 setError('');
 
-                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/tests/${testId}/admin`, {
+                    credentials: 'include'
+                });
                 const data = await res.json();
 
                 if (!res.ok) {

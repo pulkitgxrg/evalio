@@ -63,6 +63,25 @@ exports.getTestById = async (req, res) => {
             return res.status(404).json({ message: 'Test not found' });
         }
 
+        const questions = await Question.find({ questionId: { $in: test.questions } }).select('-correctAnswer -difficulty -topic -subTopic');
+        const orderedQuestions = test.questions.map(id => questions.find(q => q.questionId === id)).filter(Boolean);
+
+        res.json({
+            ...test.toObject(),
+            questions: orderedQuestions
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getTestByIdForAdmin = async (req, res) => {
+    try {
+        const test = await Test.findById(req.params.id);
+        if (!test) {
+            return res.status(404).json({ message: 'Test not found' });
+        }
+
         const questions = await Question.find({ questionId: { $in: test.questions } });
         const orderedQuestions = test.questions.map(id => questions.find(q => q.questionId === id)).filter(Boolean); // filter to remove any missing questions
 

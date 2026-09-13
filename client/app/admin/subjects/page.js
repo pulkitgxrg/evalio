@@ -68,6 +68,7 @@ export default function SubjectsPage() {
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects`, {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
                     userId
@@ -116,6 +117,7 @@ export default function SubjectsPage() {
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/subjects/${subjectId}`, {
                 method: "DELETE",
+                credentials: "include",
                 headers: {
                     userId
                 }

@@ -41,6 +41,7 @@ export default function UserManagementPage() {
             const currentUser = JSON.parse(currentUserStr);
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/users`, {
+                credentials: 'include',
                 headers: {
                     userId: currentUser._id || currentUser.user_id
                 }
@@ -103,6 +104,7 @@ export default function UserManagementPage() {
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/users/${editingUser._id}`, {
                 method: 'PUT',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     userId: currentUser._id || currentUser.user_id
@@ -143,6 +145,7 @@ export default function UserManagementPage() {
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/v1/auth/users/${user._id}`, {
                 method: 'DELETE',
+                credentials: 'include',
                 headers: {
                     userId: currentUser._id || currentUser.user_id
                 }

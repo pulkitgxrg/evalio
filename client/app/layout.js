@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import MobileBlocker from "@/components/layout/MobileBlocker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -79,6 +80,7 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <MobileBlocker />
         <QueryProvider>
           {children}
           <Analytics />

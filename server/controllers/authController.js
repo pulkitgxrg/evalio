@@ -17,13 +17,28 @@ exports.signup = async (req, res) => {
             })
         }
 
+        const hashedPassword = await bcrypt.hash(password, 8);
+
         const existing = await User.findOne({ email });
         if (existing) {
+            if (existing.isDeleted) {
+                existing.name = name;
+                existing.password = hashedPassword;
+                existing.study_year = year;
+                existing.isDeleted = false;
+                existing.deletedAt = null;
+                existing.isVerified = false;
+
+                await existing.save();
+                await sendVerificationMail(existing);
+                return res.status(200).send({
+                    message: "signup successful"
+                })
+            }
+
             const message = existing.isVerified ? "User already exists with this email" : "User already exists and is not verified. Check your inbox for the verification email";
             return res.status(409).send({ message });
         }
-
-        const hashedPassword = await bcrypt.hash(password, 8);
 
         const user = new User({
             name: name,
@@ -54,6 +69,10 @@ exports.login = async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).send({ error: "Invalid Credentials" });
+        }
+
+        if (user.isDeleted) {
+            return res.status(403).send({ message: "This account has been deleted" });
         }
 
         if (!user.isVerified) {
@@ -101,7 +120,7 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
     try {
         const user = await User.findById(req.userId);
-        if (!user) {
+        if (!user || user.isDeleted) {
             return res.status(404).json({ message: "User not found" });
         }
 
@@ -228,7 +247,7 @@ exports.resetPasswordMail = async (req, res) => {
         const { email } = req.body;
 
         const user = await User.findOne({ email: email });
-        if (!user) return res.status(400).send({ error: 'Email is not registered with us' });
+        if (!user || user.isDeleted) return res.status(400).send({ error: 'Email is not registered with us' });
 
         await sendPasswordResetMail(user);
         return res.status(200).send({ message: "Password reset link sent to your email" });

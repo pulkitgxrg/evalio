@@ -5,5 +5,6 @@ const Auth = require('../middleware/Auth');
 
 router.get('/profile',Auth, userController.profileInfo);
 router.put('/profile',Auth, userController.updateProfile);
+router.patch('/profile/delete',Auth, userController.deleteAccount);
 
 module.exports = router;

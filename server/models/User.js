@@ -57,6 +57,14 @@ const userSchema = new mongoose.Schema({
         min: [1, 'Study year must be at least 1'],
         default: 1
     },
+    isDeleted: {
+        type: Boolean,
+        default: false,
+    },
+    deletedAt: {
+        type: Date,
+        default: null,
+    },
 })
 
 const User = mongoose.model('User', userSchema);

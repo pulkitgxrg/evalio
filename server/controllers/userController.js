@@ -6,7 +6,7 @@ exports.profileInfo = async (req,res) => {
 
         const user = await User.findById(userId);
 
-        if (!user) {
+        if (!user || user.isDeleted) {
             return res.status(400).send({ message: "User not found"});
         }
 
@@ -31,7 +31,7 @@ exports.updateProfile = async (req,res) => {
 
         const user = await User.findById(userId);
 
-        if (!user) {
+        if (!user || user.isDeleted) {
             return res.status(400).send({ message: "User not found"});
         }
         
@@ -41,6 +41,33 @@ exports.updateProfile = async (req,res) => {
         await user.save();
         
         res.status(200).send({ message: "Profile updated successfully"});
+    } catch (err) {
+        res.status(500).send(err);
+    }
+}
+
+exports.deleteAccount = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        const user = await User.findById(userId);
+
+        if (!user || user.isDeleted) {
+            return res.status(400).send({ message: "User not found"});
+        }
+
+        await User.findByIdAndUpdate(userId, {
+            isDeleted: true,
+            deletedAt: new Date(),
+        });
+
+        res.clearCookie("token", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        });
+
+        res.status(200).send({ message: "Account deleted successfully"});
     } catch (err) {
         res.status(500).send(err);
     }

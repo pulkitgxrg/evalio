@@ -24,3 +24,15 @@ export function useUpdateProfileMutation() {
     },
   });
 }
+
+export function useDeleteAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      apiFetch("/api/v1/users/profile/delete", { method: "PATCH" }),
+    onSettled: () => {
+      queryClient.clear();
+    },
+  });
+}

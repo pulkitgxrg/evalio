@@ -10,9 +10,15 @@ import {
   GraduationCap,
   Save,
   Loader2,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { useProfile, useUpdateProfileMutation } from "@/hooks/useProfile";
+import {
+  useProfile,
+  useUpdateProfileMutation,
+  useDeleteAccountMutation,
+} from "@/hooks/useProfile";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -37,8 +43,10 @@ export default function ProfilePage() {
 
 function ProfileForm({ router, initialProfile, loadError }) {
   const updateProfileMutation = useUpdateProfileMutation();
+  const deleteAccountMutation = useDeleteAccountMutation();
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [profile, setProfile] = useState({
     name: initialProfile?.name || "",
     email: initialProfile?.email || "",
@@ -74,7 +82,25 @@ function ProfileForm({ router, initialProfile, loadError }) {
     }
   };
 
+  const handleDeleteAccount = () => {
+    setError("");
+    setSuccess("");
+
+    deleteAccountMutation.mutate(undefined, {
+      onSuccess: () => {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        router.replace("/login");
+      },
+      onError: (err) => {
+        setConfirmingDelete(false);
+        setError(err.message || "Could not delete your account");
+      },
+    });
+  };
+
   const saving = updateProfileMutation.isPending;
+  const deleting = deleteAccountMutation.isPending;
   const formattedDate = profile.createdAt
     ? new Date(profile.createdAt).toLocaleDateString()
     : "-";
@@ -272,6 +298,69 @@ function ProfileForm({ router, initialProfile, loadError }) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-6 bg-white rounded-lg shadow-xs border border-red-200 p-6 md:p-8">
+              <div className="flex items-start gap-3 mb-5">
+                <span className="mt-0.5 text-red-500">
+                  <AlertTriangle size={18} />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 tracking-tight">
+                    Delete Account
+                  </h2>
+                  <p className="text-[13px] text-slate-500 leading-relaxed mt-0.5">
+                    Your account will be deactivated and you will be signed out
+                    immediately. You will no longer be able to log in or take
+                    tests with this account.
+                  </p>
+                </div>
+              </div>
+
+              {confirmingDelete ? (
+                <div className="rounded-md border border-red-200 bg-red-50 p-4">
+                  <p className="text-[13px] font-medium text-red-800 mb-4">
+                    Are you sure you want to delete your account?
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleDeleteAccount}
+                      disabled={deleting}
+                      className="inline-flex items-center gap-2 rounded-md bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-xs hover:bg-red-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={16} />
+                          Yes, delete my account
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                      className="rounded-md border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 hover:bg-gray-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="inline-flex items-center gap-2 rounded-md border border-red-300 bg-white px-5 py-2 text-sm font-bold text-red-600 shadow-xs hover:bg-red-50 transition-all"
+                >
+                  <Trash2 size={16} />
+                  Delete Account
+                </button>
+              )}
             </div>
           </div>
         </main>

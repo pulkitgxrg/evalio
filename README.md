@@ -1,5 +1,5 @@
 <div align="center">
- <img alt="evalio" width="200px" height="auto" src="https://raw.githubusercontent.com/pulkitgarg04/evalio/main/evalio.png">
+ <img alt="evalio" width="200px" height="auto" src="https://raw.githubusercontent.com/pulkitgxrg/evalio/main/evalio.png">
 </div>
 <p align="center">Exam preparation platform for Chitkara CSE Students</p>
 <br>
